@@ -41,5 +41,11 @@
   },
   "overrides": {
     "tinypool": "^2.1.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "protobufjs",
+      "esbuild"
+    ]
   }
 }
