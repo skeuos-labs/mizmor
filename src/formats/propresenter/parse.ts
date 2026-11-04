@@ -25,18 +25,25 @@ function colorToHex(color: ProColor | null | undefined): string | undefined {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+function toUint8Array(val: unknown): Uint8Array | null {
+  if (val instanceof Uint8Array) return val;
+  if (ArrayBuffer.isView(val)) return new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
+  return null;
+}
+
 function extractRtfStrings(cue: ProCue): string[] {
   const out: string[] = [];
   for (const action of cue.actions ?? []) {
     for (const el of action?.slide?.presentation?.baseSlide?.elements ?? []) {
       const rtf = el?.element?.text?.rtfData;
-      if (rtf instanceof Uint8Array) {
-        out.push(decodeRtfBytes(rtf));
+      const bytes = toUint8Array(rtf);
+      if (bytes) {
+        out.push(decodeRtfBytes(bytes));
       } else if (typeof rtf === 'string' && rtf.length > 0) {
         // Some producers store RTF as a latin1 string; re-encode to bytes for the decoder.
-        const bytes = new Uint8Array(rtf.length);
-        for (let i = 0; i < rtf.length; i++) bytes[i] = rtf.charCodeAt(i) & 0xff;
-        out.push(decodeRtfBytes(bytes));
+        const strBytes = new Uint8Array(rtf.length);
+        for (let i = 0; i < rtf.length; i++) strBytes[i] = rtf.charCodeAt(i) & 0xff;
+        out.push(decodeRtfBytes(strBytes));
       }
     }
   }
@@ -47,9 +54,10 @@ function rawRtfPresence(cue: ProCue): boolean {
   for (const action of cue.actions ?? []) {
     for (const el of action?.slide?.presentation?.baseSlide?.elements ?? []) {
       const rtf = el?.element?.text?.rtfData;
-      if (rtf instanceof Uint8Array) {
+      const bytes = toUint8Array(rtf);
+      if (bytes) {
         let s = '';
-        for (let i = 0; i < rtf.length; i++) s += String.fromCharCode(rtf[i]!);
+        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
         if (rtfHasFormatting(s)) return true;
       } else if (typeof rtf === 'string' && rtfHasFormatting(rtf)) {
         return true;
