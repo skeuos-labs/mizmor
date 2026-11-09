@@ -274,7 +274,8 @@ export async function parsePptx(
   bytes: Uint8Array,
   fileName?: string
 ): Promise<ParsePptxResult> {
-  if (!bytes || !(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+  const isBytes = bytes instanceof Uint8Array || ArrayBuffer.isView(bytes);
+  if (!bytes || !isBytes || bytes.byteLength === 0) {
     return {
       ok: false,
       error: new Error(
@@ -283,10 +284,13 @@ export async function parsePptx(
     };
   }
 
+  const rawView = bytes as unknown as ArrayBufferView;
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(rawView.buffer, rawView.byteOffset, rawView.byteLength);
+
   let zipReader: ZipReader<Uint8Array> | undefined;
   let entries;
   try {
-    zipReader = new ZipReader(new Uint8ArrayReader(bytes));
+    zipReader = new ZipReader(new Uint8ArrayReader(u8));
     entries = await zipReader.getEntries();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

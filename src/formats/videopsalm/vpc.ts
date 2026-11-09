@@ -15,7 +15,8 @@ export async function parseVpc(
   bytes: Uint8Array,
   fileName?: string
 ): Promise<Result<Library>> {
-  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+  const isBytes = bytes instanceof Uint8Array || ArrayBuffer.isView(bytes);
+  if (!bytes || !isBytes || bytes.byteLength === 0) {
     return {
       ok: false,
       error: new Error(
@@ -24,9 +25,12 @@ export async function parseVpc(
     };
   }
 
+  const rawView = bytes as unknown as ArrayBufferView;
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(rawView.buffer, rawView.byteOffset, rawView.byteLength);
+
   let zipReader: ZipReader<Uint8Array> | undefined;
   try {
-    zipReader = new ZipReader(new Uint8ArrayReader(bytes), { password: VPC_KEY });
+    zipReader = new ZipReader(new Uint8ArrayReader(u8), { password: VPC_KEY });
     const entries = await zipReader.getEntries();
     const jsonEntry = entries.find(
       (e) =>
