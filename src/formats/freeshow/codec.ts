@@ -139,18 +139,21 @@ export async function parseFreeShow(
   bytes: Uint8Array,
   fileName?: string
 ): Promise<Result<Library>> {
-  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+  const isBytes = bytes instanceof Uint8Array || ArrayBuffer.isView(bytes);
+  if (!bytes || !isBytes || bytes.byteLength === 0) {
     return {
       ok: false,
       error: new Error(`Invalid or empty FreeShow bytes${fileName ? ` (${fileName})` : ''}.`),
     };
   }
 
+  const rawView = bytes as unknown as ArrayBufferView;
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(rawView.buffer, rawView.byteOffset, rawView.byteLength);
   let rawJson: string;
 
-  if (isRawJson(bytes)) {
+  if (isRawJson(u8)) {
     try {
-      rawJson = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      rawJson = new TextDecoder('utf-8', { fatal: true }).decode(u8);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -161,7 +164,7 @@ export async function parseFreeShow(
   } else {
     let zipReader: ZipReader<Uint8Array> | undefined;
     try {
-      zipReader = new ZipReader(new Uint8ArrayReader(bytes));
+      zipReader = new ZipReader(new Uint8ArrayReader(u8));
       const entries = await zipReader.getEntries();
       const jsonEntry = entries.find(
         (e) =>

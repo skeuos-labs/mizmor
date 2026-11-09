@@ -68,24 +68,27 @@ export function detectFormat(
   }
 
   // 2. Sniffs magic bytes
-  if (!bytes || !(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+  const isBytes = bytes instanceof Uint8Array || ArrayBuffer.isView(bytes);
+  if (!bytes || !isBytes || bytes.byteLength === 0) {
     return undefined;
   }
+  const rawView = bytes as unknown as ArrayBufferView;
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(rawView.buffer, rawView.byteOffset, rawView.byteLength);
 
   // 0x0a: .pro (Protobuf tag 1)
-  if (bytes[0] === 0x0a) {
+  if (u8[0] === 0x0a) {
     return 'pro';
   }
 
   // 0x50, 0x4b ('PK'): ZIP file
-  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+  if (u8[0] === 0x50 && u8[1] === 0x4b) {
     if (
-      containsAscii(bytes, '[Content_Types].xml') ||
-      containsAscii(bytes, 'ppt/')
+      containsAscii(u8, '[Content_Types].xml') ||
+      containsAscii(u8, 'ppt/')
     ) {
       return 'pptx';
     }
-    if (containsAscii(bytes, 'show.json')) {
+    if (containsAscii(u8, 'show.json')) {
       return 'freeshow';
     }
     // Fallback for ZIP archive (VideoPsalm VPC archive)
@@ -95,9 +98,9 @@ export function detectFormat(
   // First non-whitespace '{' or '[': .json or .show
   let firstNonWs: number | undefined;
   let firstIdx = -1;
-  const scanLimit = Math.min(bytes.byteLength, 1024);
+  const scanLimit = Math.min(u8.byteLength, 1024);
   for (let i = 0; i < scanLimit; i++) {
-    const b = bytes[i]!;
+    const b = u8[i]!;
     if (b !== 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) {
       firstNonWs = b;
       firstIdx = i;
@@ -107,7 +110,7 @@ export function detectFormat(
 
   if (firstNonWs === 0x7b /* { */ || firstNonWs === 0x5b /* [ */) {
     const sample = new TextDecoder('utf-8', { fatal: false }).decode(
-      bytes.subarray(firstIdx, Math.min(bytes.byteLength, firstIdx + 2048))
+      u8.subarray(firstIdx, Math.min(u8.byteLength, firstIdx + 2048))
     );
     if (
       sample.includes('"presentations"') ||
@@ -122,7 +125,7 @@ export function detectFormat(
   }
 
   // ProPresenter 6 XML sniffing
-  if (containsAscii(bytes, 'RVPresentationDocument')) {
+  if (containsAscii(u8, 'RVPresentationDocument')) {
     return 'pro6';
   }
 
