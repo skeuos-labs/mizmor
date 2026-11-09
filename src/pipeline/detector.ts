@@ -109,7 +109,13 @@ export function detectFormat(
     const sample = new TextDecoder('utf-8', { fatal: false }).decode(
       bytes.subarray(firstIdx, Math.min(bytes.byteLength, firstIdx + 2048))
     );
-    if (sample.includes('"presentations"') || sample.includes('"groups"')) {
+    if (
+      sample.includes('"presentations"') ||
+      sample.includes('"groups"') ||
+      sample.includes('"category"') ||
+      sample.includes('"layouts"') ||
+      sample.includes('"activeLayout"')
+    ) {
       return 'freeshow';
     }
     return 'json';

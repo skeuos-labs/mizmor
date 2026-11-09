@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
+import {
+  TextReader,
+  TextWriter,
+  Uint8ArrayReader,
+  Uint8ArrayWriter,
+  ZipReader,
+  ZipWriter,
+} from '@zip.js/zip.js';
 import { describe, expect, it } from 'vitest';
 import { AMAZING_GRACE } from '../../src/fixtures/amazing-grace.js';
 import {
@@ -188,6 +195,22 @@ describe('VideoPsalm VPC Archive Reader & Writer', () => {
       expect(presentations[1]!.slides[1]!.items[0]!.plainText).toBe(
         'Great is Thy faithfulness'
       );
+    });
+
+    it('generates root songbook metadata (Text, Guid) and uses songbook name for internal json entry', async () => {
+      const writeRes = await writeVpc([AMAZING_GRACE], 'My_Hymnal');
+      expect(writeRes.ok).toBe(true);
+      if (!writeRes.ok) return;
+
+      const reader = new ZipReader(new Uint8ArrayReader(writeRes.value.bytes), { password: VPC_KEY });
+      const entries = await reader.getEntries();
+      expect(entries[0].filename).toBe('My_Hymnal.json');
+      const text = await entries[0].getData!(new TextWriter());
+      await reader.close();
+
+      expect(text).toContain('Text:"My_Hymnal"');
+      expect(text).toContain('Guid:');
+      expect(text).toContain('Songs:[');
     });
   });
 

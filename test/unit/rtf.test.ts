@@ -7,14 +7,14 @@ import {
 
 describe('RTF Codec', () => {
   describe('encodeRtf', () => {
-    it('encodes plain text into RTF bytes with standard ProPresenter font table', () => {
+    it('encodes plain text into RTF bytes with standard ProPresenter font table and white color table', () => {
       const plain = 'Amazing Grace';
       const bytes = encodeRtf(plain);
       expect(bytes).toBeInstanceOf(Uint8Array);
 
       const rtfString = new TextDecoder('utf-8').decode(bytes);
       expect(rtfString).toBe(
-        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}\\f0\\fs96 Amazing Grace}'
+        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}{\\colortbl;\\red255\\green255\\blue255;}\\f0\\fs96\\cf1 Amazing Grace}'
       );
     });
 
@@ -28,7 +28,7 @@ describe('RTF Codec', () => {
       const rtfCr = new TextDecoder().decode(encodeRtf(textCr));
 
       const expected =
-        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}\\f0\\fs96 Line 1\\par\r\nLine 2}';
+        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}{\\colortbl;\\red255\\green255\\blue255;}\\f0\\fs96\\cf1 Line 1\\par\r\nLine 2}';
 
       expect(rtfLf).toBe(expected);
       expect(rtfCrlf).toBe(expected);
@@ -54,7 +54,7 @@ describe('RTF Codec', () => {
       const bytes = encodeRtf('');
       const rtf = new TextDecoder().decode(bytes);
       expect(rtf).toBe(
-        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}\\f0\\fs96 }'
+        '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}{\\colortbl;\\red255\\green255\\blue255;}\\f0\\fs96\\cf1 }'
       );
     });
   });
