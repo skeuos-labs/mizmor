@@ -89,6 +89,16 @@ describe('ProPresenter 7 Protobuf Writer', () => {
       expect(decodedObj.cues[0].actions[0].slide.presentation.baseSlide.elements[0].element.text.scaleBehavior).toBe(
         'SCALE_BEHAVIOR_SCALE_FONT_DOWN'
       );
+
+      // White text color default for dark projection screens
+      expect(element.text.attributes.textSolidFill.red).toBe(1);
+      expect(element.text.attributes.textSolidFill.green).toBe(1);
+      expect(element.text.attributes.textSolidFill.blue).toBe(1);
+      expect(element.text.attributes.textSolidFill.alpha).toBe(1);
+
+      const rtfStr = new TextDecoder('utf-8').decode(element.text.rtfData);
+      expect(rtfStr).toContain('\\colortbl;\\red255\\green255\\blue255;');
+      expect(rtfStr).toContain('\\cf1');
     });
   });
 

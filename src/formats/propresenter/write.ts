@@ -122,6 +122,12 @@ export function writePro(presentation: CanonicalPresentation): WriteProResult {
                             alignment: 2, // ALIGNMENT_CENTER
                             lineHeightMultiple: 1,
                           },
+                          textSolidFill: {
+                            red: 1,
+                            green: 1,
+                            blue: 1,
+                            alpha: 1,
+                          },
                         },
                         scaleBehavior: 2, // SCALE_BEHAVIOR_SCALE_FONT_DOWN
                         rtfData: rtfBytes,

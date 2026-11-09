@@ -26,7 +26,8 @@ const SECTION_TO_TAG: Readonly<Record<string, number>> = Object.freeze({
 });
 
 function sanitizeEntryTitle(title: string): string {
-  const sanitized = title.replace(/[/\\]/g, '_').trim();
+  const base = title.split(/[/\\]/).pop() || title;
+  const sanitized = base.replace(/[/\\:*?"<>|]/g, '_').trim();
   return sanitized.length > 0 ? sanitized : 'song';
 }
 
@@ -35,7 +36,8 @@ function sanitizeEntryTitle(title: string): string {
  * Fails closed if presentations array is empty.
  */
 export async function writeVpc(
-  presentations: Presentation[]
+  presentations: Presentation[],
+  songbookTitle?: string
 ): Promise<Result<{ bytes: Uint8Array; warnings: Warning[] }>> {
   if (!Array.isArray(presentations) || presentations.length === 0) {
     return {
@@ -114,13 +116,21 @@ export async function writeVpc(
       songs.push(songObj);
     }
 
-    const songbook = { Songs: songs };
+    const rawTitle =
+      songbookTitle?.trim() ||
+      (presentations.length === 1
+        ? presentations[0]!.title
+        : presentations[0]?.metadata?.originalFileName || 'SongBook');
+    const title = sanitizeEntryTitle(rawTitle).replace(/\.(vpc|json)$/i, '');
+
+    const songbook = {
+      Guid: presentations[0]?.metadata?.songId ?? presentations[0]?.id ?? 'songbook-guid',
+      Text: title,
+      Songs: songs,
+    };
     const serialized = serializeDialect(songbook);
 
-    const entryName =
-      presentations.length === 1
-        ? `${sanitizeEntryTitle(presentations[0]!.title)}.json`
-        : 'library.json';
+    const entryName = `${title}.json`;
 
     const zipWriter = new ZipWriter(new Uint8ArrayWriter(), {
       password: VPC_KEY,

@@ -208,43 +208,56 @@ export async function parseFreeShow(
     };
   }
 
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    return {
-      ok: false,
-      error: new Error('FreeShow document has no presentations.'),
-    };
-  }
-
-  const fsDoc = doc as FsDocument;
-  if (!fsDoc.presentations || typeof fsDoc.presentations !== 'object') {
-    return {
-      ok: false,
-      error: new Error('FreeShow document has no presentations.'),
-    };
-  }
-
-  const presEntries: [string, FsPresentation][] = Array.isArray(fsDoc.presentations)
-    ? fsDoc.presentations.map((p, i) => [String(i), p])
-    : Object.entries(fsDoc.presentations);
-
-  if (presEntries.length === 0) {
-    return {
-      ok: false,
-      error: new Error('FreeShow document has no presentations.'),
-    };
-  }
-
+  let presEntries: [string, FsPresentation][];
   const groupNames = new Map<string, string>();
   const groupColors = new Map<string, string>();
-  for (const [id, g] of Object.entries(fsDoc.groups ?? {})) {
-    if (g && typeof g === 'object') {
-      if (typeof g.name === 'string' && g.name.trim() !== '') {
-        groupNames.set(id, g.name.trim());
-      }
-      if (typeof g.color === 'string' && g.color.trim() !== '') {
-        groupColors.set(id, g.color.trim());
+
+  if (Array.isArray(doc)) {
+    if (doc.length === 2 && typeof doc[0] === 'string' && doc[1] && typeof doc[1] === 'object') {
+      const showId = doc[0];
+      const showData = doc[1] as FsPresentation;
+      presEntries = [[showId, showData]];
+    } else {
+      return {
+        ok: false,
+        error: new Error('FreeShow document array is not in [id, show] format.'),
+      };
+    }
+  } else if (doc && typeof doc === 'object') {
+    const fsDoc = doc as FsDocument;
+    if (!fsDoc.presentations || typeof fsDoc.presentations !== 'object') {
+      return {
+        ok: false,
+        error: new Error('FreeShow document has no presentations.'),
+      };
+    }
+
+    presEntries = Array.isArray(fsDoc.presentations)
+      ? fsDoc.presentations.map((p, i) => [String(i), p])
+      : Object.entries(fsDoc.presentations);
+
+    if (presEntries.length === 0) {
+      return {
+        ok: false,
+        error: new Error('FreeShow document has no presentations.'),
+      };
+    }
+
+    for (const [id, g] of Object.entries(fsDoc.groups ?? {})) {
+      if (g && typeof g === 'object') {
+        if (typeof g.name === 'string' && g.name.trim() !== '') {
+          groupNames.set(id, g.name.trim());
+        }
+        if (typeof g.color === 'string' && g.color.trim() !== '') {
+          groupColors.set(id, g.color.trim());
+        }
       }
     }
+  } else {
+    return {
+      ok: false,
+      error: new Error('FreeShow document has no presentations.'),
+    };
   }
 
   const libraryWarnings: Warning[] = [];
@@ -560,13 +573,15 @@ export async function writeFreeShow(
       }));
       slides[slide.id] = {
         name: slide.label ?? '',
-        group: groupId,
+        group: groupName,
         color: section?.color ?? '',
+        settings: {},
         notes: '',
         items: [
           {
             type: 'text',
             lines,
+            style: 'top:120px;left:50px;height:840px;width:1820px;',
           },
         ],
       };
@@ -611,29 +626,49 @@ export async function writeFreeShow(
     };
   }
 
-  const doc = { presentations, groups };
-  const serialized = JSON.stringify(doc, null, 2);
+  // Native FreeShow project format for single presentation: [ showId, showData ]
+  if (library.presentations.length === 1) {
+    const p = library.presentations[0]!;
+    const presObj = presentations[p.id] as Record<string, unknown>;
+    const nativeShow = {
+      name: p.title,
+      category: 'song',
+      private: false,
+      settings: {
+        activeLayout: 'default',
+        template: 'default',
+      },
+      timestamps: {
+        created: Date.now(),
+        modified: null,
+        used: null,
+      },
+      quickAccess: {},
+      meta: presObj.meta ?? {},
+      slides: presObj.slides ?? {},
+      layouts: presObj.layouts ?? {},
+      media: {},
+    };
 
-  const writer = new ZipWriter(new Uint8ArrayWriter());
-  try {
-    await writer.add('show.json', new TextReader(serialized));
-    const bytes = await writer.close();
+    const nativeDoc = [p.id, nativeShow];
+    const bytes = new TextEncoder().encode(JSON.stringify(nativeDoc, null, 2));
+
     return {
       ok: true,
       value: { bytes, warnings },
       bytes,
       warnings,
     };
-  } catch (err) {
-    try {
-      await writer.close();
-    } catch {
-      // Ignore secondary close error
-    }
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      error: new Error(`Failed to build FreeShow archive: ${message}`),
-    };
   }
+
+  // Multi-presentation bundle
+  const doc = { presentations, groups };
+  const multiBytes = new TextEncoder().encode(JSON.stringify(doc, null, 2));
+
+  return {
+    ok: true,
+    value: { bytes: multiBytes, warnings },
+    bytes: multiBytes,
+    warnings,
+  };
 }

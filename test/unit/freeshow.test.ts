@@ -43,6 +43,16 @@ describe('FreeShow .show Codec', () => {
       expect(writeRes.value.bytes).toBeInstanceOf(Uint8Array);
       expect(writeRes.value.bytes.byteLength).toBeGreaterThan(0);
 
+      // Native FreeShow format: uncompressed JSON array [ id, showData ]
+      const rawText = new TextDecoder('utf-8').decode(writeRes.value.bytes);
+      expect(rawText.trim().startsWith('[')).toBe(true);
+      const parsedArray = JSON.parse(rawText);
+      expect(Array.isArray(parsedArray)).toBe(true);
+      expect(parsedArray).toHaveLength(2);
+      expect(typeof parsedArray[0]).toBe('string');
+      expect(parsedArray[1].name).toBe('Amazing Grace');
+      expect(parsedArray[1].category).toBe('song');
+
       const parseRes = await parseFreeShow(writeRes.value.bytes, 'Amazing Grace.show');
       expect(parseRes.ok).toBe(true);
       if (!parseRes.ok) return;
@@ -206,6 +216,45 @@ describe('FreeShow .show Codec', () => {
       expect(res.value.presentations[0]!.slides[0]!.items[0]!.plainText).toBe(
         'Chorus line with whitespace'
       );
+    });
+
+    it('parses native FreeShow [id, show] array format', async () => {
+      const nativeDoc = [
+        'show-guid-12345',
+        {
+          name: 'Native FreeShow Song',
+          category: 'song',
+          meta: { title: 'Native FreeShow Song', author: 'Author Name', CCLI: '54321' },
+          settings: { activeLayout: 'default' },
+          layouts: {
+            default: {
+              name: 'Default',
+              slides: [{ id: 'slide-a' }, { id: 'slide-b' }],
+            },
+          },
+          slides: {
+            'slide-a': {
+              group: 'Verse 1',
+              color: '#5825f5',
+              items: [{ lines: [{ text: [{ value: 'Native verse line 1' }] }] }],
+            },
+            'slide-b': {
+              group: 'Chorus',
+              color: '#f525d2',
+              items: [{ lines: [{ text: [{ value: 'Native chorus line' }] }] }],
+            },
+          },
+        },
+      ];
+      const rawBytes = new TextEncoder().encode(JSON.stringify(nativeDoc));
+      const res = await parseFreeShow(rawBytes, 'Native.show');
+      expect(res.ok).toBe(true);
+      if (!res.ok) throw res.error;
+      expect(res.value.presentations).toHaveLength(1);
+      expect(res.value.presentations[0].title).toBe('Native FreeShow Song');
+      expect(res.value.presentations[0].slides).toHaveLength(2);
+      expect(res.value.presentations[0].slides[0].items[0].plainText).toBe('Native verse line 1');
+      expect(res.value.presentations[0].slides[1].items[0].plainText).toBe('Native chorus line');
     });
 
     it('fails closed on invalid raw JSON starting with [', async () => {
@@ -513,13 +562,21 @@ describe('FreeShow .show Codec', () => {
 
   describe('writeFreeShow: Line Splitting & Default Arrangement', () => {
     async function unpackShowJson(bytes: Uint8Array): Promise<any> {
+      const text = new TextDecoder('utf-8').decode(bytes);
+      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'string') {
+          return { presentations: { [parsed[0]]: parsed[1] }, groups: {} };
+        }
+        return parsed;
+      }
       const reader = new ZipReader(new Uint8ArrayReader(bytes));
       const entries = await reader.getEntries();
       const jsonEntry = entries.find((e) => e.filename === 'show.json');
       expect(jsonEntry).toBeDefined();
-      const text = await jsonEntry!.getData(new TextWriter());
+      const zipText = await jsonEntry!.getData(new TextWriter());
       await reader.close();
-      return JSON.parse(text);
+      return JSON.parse(zipText);
     }
 
     it('splits multi-line slide text on newlines into distinct line objects', async () => {

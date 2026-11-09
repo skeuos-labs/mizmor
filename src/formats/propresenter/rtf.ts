@@ -122,7 +122,7 @@ export function encodeRtf(plainText: string): Uint8Array {
     }
   }
 
-  const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}\\f0\\fs96 ${escaped}}`;
+  const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Helvetica;}}{\\colortbl;\\red255\\green255\\blue255;}\\f0\\fs96\\cf1 ${escaped}}`;
   return new TextEncoder().encode(rtf);
 }
 
